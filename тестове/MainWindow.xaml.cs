@@ -1,4 +1,5 @@
-﻿using OfficeOpenXml;
+﻿using Data.Models;
+using OfficeOpenXml;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -22,37 +23,55 @@ namespace тестове
     /// </summary>
     public partial class MainWindow : Window
     {
-        private List<Dictionary<string, object>> _data = new List<Dictionary<string, object>>();
+        private List<DataModel> _data = new List<DataModel>();
 
         public MainWindow()
         {
             InitializeComponent();
         }
 
-        private void GenerateColumns()
+        private void UpdateDataGridColumns()
         {
+            // Очищаємо поточні стовпці
             dataGrid.Columns.Clear();
 
-            if (_data.Count > 0)
-            {
-                // Знаходимо всі унікальні ключі, які будуть використовуватись як стовпці
-                var columnNames = _data.SelectMany(dict => dict.Keys).Distinct();
+            if (_data.Count == 0)
+                return; // Якщо немає даних, не будуємо стовпці
 
-                foreach (var columnName in columnNames)
+            // Додаємо стовпець для ID
+            dataGrid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "ID",
+                Binding = new Binding("ID")
+            });
+
+            // Визначаємо кількість стовпців для ініціалізаційних та розрахункових даних
+            var maxInitColumns = _data.Max(d => d.InitColumns.Count);
+            var maxCalculatedColumns = _data.Max(d => d.CalculatedColumns.Count);
+
+            // Додаємо стовпці для ініціалізаційних даних
+            for (int i = 0; i < maxInitColumns; i++)
+            {
+                dataGrid.Columns.Add(new DataGridTextColumn
                 {
-                    // Створюємо новий стовпець для кожного унікального ключа
-                    dataGrid.Columns.Add(new DataGridTextColumn
-                    {
-                        Header = columnName,
-                        Binding = new System.Windows.Data.Binding($"[{columnName}]")
-                    });
-                }
+                    Header = $"InitColumn{i + 1}",
+                    Binding = new Binding($"InitColumns[{i}]")
+                });
+            }
+
+            // Додаємо стовпці для розрахункових даних
+            for (int i = 0; i < maxCalculatedColumns; i++)
+            {
+                dataGrid.Columns.Add(new DataGridTextColumn
+                {
+                    Header = $"CalculatedColumn{i + 1}",
+                    Binding = new Binding($"CalculatedColumns[{i}]")
+                });
             }
         }
 
         private void ImportExcel_Click(object sender, RoutedEventArgs e)
         {
-            // Відкриваємо діалог для вибору файлу
             Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog
             {
                 DefaultExt = ".xlsx",
@@ -65,30 +84,41 @@ namespace тестове
             {
                 string filePath = dlg.FileName;
 
+                // Встановлення контексту ліцензії EPPlus
                 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-                // Читаємо дані з Excel
                 using (ExcelPackage package = new ExcelPackage(new FileInfo(filePath)))
                 {
                     ExcelWorksheet worksheet = package.Workbook.Worksheets[0];
                     _data.Clear();
-                    int startRow = 2; // Пропускаємо заголовок
+                    int startRow = 2; // Перший рядок — це заголовки
 
                     for (int row = startRow; row <= worksheet.Dimension.End.Row; row++)
                     {
-                        var rowData = new Dictionary<string, object>();
-
-                        for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                        var dataModel = new DataModel
                         {
-                            string columnName = worksheet.Cells[1, col].Text;
-                            string cellValue = worksheet.Cells[row, col].Text;
-                            rowData[columnName] = cellValue;
+                            ID = worksheet.Cells[row, 1].Text
+                        };
+
+                        // Зчитуємо стовпці ініціалізації
+                        for (int col = 2; col <= 6; col++)
+                        {
+                            dataModel.InitColumns.Add(worksheet.Cells[row, col].Text);
                         }
 
-                        _data.Add(rowData);
+                        // Зчитуємо розрахункові стовпці
+                        for (int col = 7; col <= 11; col++)
+                        {
+                            dataModel.CalculatedColumns.Add(worksheet.Cells[row, col].Text);
+                        }
+
+                        _data.Add(dataModel);
                     }
 
-                    GenerateColumns();
+                    // Оновлюємо стовпці DataGrid
+                    UpdateDataGridColumns();
+
+                    // Оновлюємо джерело даних для DataGrid
                     dataGrid.ItemsSource = _data;
                     dataGrid.Items.Refresh();
                 }
@@ -97,7 +127,6 @@ namespace тестове
 
         private void ExportExcel_Click(object sender, RoutedEventArgs e)
         {
-            // Відкриваємо діалог для збереження файлу
             Microsoft.Win32.SaveFileDialog dlg = new Microsoft.Win32.SaveFileDialog
             {
                 DefaultExt = ".xlsx",
@@ -110,30 +139,40 @@ namespace тестове
             {
                 string filePath = dlg.FileName;
 
+                // Встановлення контексту ліцензії EPPlus
                 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
-                // Зберігаємо дані у Excel
                 using (ExcelPackage package = new ExcelPackage())
                 {
                     ExcelWorksheet worksheet = package.Workbook.Worksheets.Add("Sheet1");
 
-                    if (_data.Count > 0)
-                    {
-                        var columnNames = _data.SelectMany(dict => dict.Keys).Distinct().ToList();
+                    // Заповнюємо заголовки
+                    worksheet.Cells[1, 1].Value = "ID";
 
-                        // Записуємо заголовки
-                        for (int col = 0; col < columnNames.Count; col++)
+                    // Заповнення заголовків для ініціалізаційних і розрахункових полів
+                    for (int i = 0; i < 5; i++)
+                    {
+                        worksheet.Cells[1, i + 2].Value = $"InitColumn{i + 1}";
+                        worksheet.Cells[1, i + 7].Value = $"CalculatedColumn{i + 1}";
+                    }
+
+                    // Заповнюємо дані
+                    for (int row = 0; row < _data.Count; row++)
+                    {
+                        var data = _data[row];
+
+                        worksheet.Cells[row + 2, 1].Value = data.ID;
+
+                        // Заповнюємо динамічні ініціалізаційні стовпці
+                        for (int i = 0; i < data.InitColumns.Count; i++)
                         {
-                            worksheet.Cells[1, col + 1].Value = columnNames[col];
+                            worksheet.Cells[row + 2, i + 2].Value = data.InitColumns[i];
                         }
 
-                        // Записуємо дані
-                        for (int row = 0; row < _data.Count; row++)
+                        // Заповнюємо динамічні розрахункові стовпці
+                        for (int i = 0; i < data.CalculatedColumns.Count; i++)
                         {
-                            for (int col = 0; col < columnNames.Count; col++)
-                            {
-                                worksheet.Cells[row + 2, col + 1].Value = _data[row][columnNames[col]];
-                            }
+                            worksheet.Cells[row + 2, i + 7].Value = data.CalculatedColumns[i];
                         }
                     }
 
