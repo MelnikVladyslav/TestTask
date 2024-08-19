@@ -1,0 +1,18 @@
+﻿<Window x:Class="тестове.Windows.ColumnTypeSelectionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:тестове.Windows"
+        mc:Ignorable="d"
+        Title="ColumnTypeSelectionWindow" Height="200" Width="400">
+    <Grid>
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock Text="Select what to add:" FontSize="16" Margin="10" />
+            <Button Content="Add Init Column" Width="200" Margin="5" Click="AddInitColumn_Click" />
+            <Button Content="Add Calculated Column" Width="200" Margin="5" Click="AddCalculatedColumn_Click" />
+            <Button Content="Add User Column" Width="200" Margin="5" Click="AddUserColumn_Click" />
+            <Button Content="Add Row" Width="200" Margin="5" Click="AddRow" />
+        </StackPanel>
+    </Grid>
+</Window>
